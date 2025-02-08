@@ -67,8 +67,8 @@ def concatenate_videos(date, video_files, output_dir):
             os.remove(list_file)
 
 def main():
-    root_dir = r"G:\图片、视频\2025\2025.1.26-2.25.2.5过年期间\监控视频"
-    output_dir = r"G:\图片、视频\2025\拼接后视频"
+    root_dir = r"G:\监控视频"
+    output_dir = r"G:\拼接后视频"
 
     # 检查 FFmpeg 是否可用
     try:
