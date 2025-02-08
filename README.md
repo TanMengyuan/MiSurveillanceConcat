@@ -15,3 +15,8 @@
 ```bash
 pip install -r requirements.txt
 
+#🚀 使用方法
+修改 main.py 里的 root_dir 变量，设置监控视频存放路径##
+运行脚本##
+python main.py##
+合并后的视频保存在 output_dir 目录##
