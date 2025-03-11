@@ -3,6 +3,7 @@ import subprocess
 import json
 from concurrent.futures import ProcessPoolExecutor
 from collections import defaultdict
+from commons import load_config, get_date_from_dir
 
 
 def get_video_info(video_path):
@@ -25,8 +26,9 @@ def get_video_info(video_path):
     except subprocess.CalledProcessError:
         print(f"❌ 获取视频信息失败: {video_path}")
         return None
-    
+
     return video_info
+
 
 def analyze_videos(video_list):
     """
@@ -56,6 +58,7 @@ def analyze_videos(video_list):
                 print(f"⚠️ 解析 {video} 失败，可能文件损坏！")
 
     return total_duration, resolutions, audio_codecs
+
 
 def verify_video_integrity(date, original_videos, merged_video):
     """
@@ -108,9 +111,14 @@ def verify_video_integrity(date, original_videos, merged_video):
     print(f"✅ {date} 拼接完整性检查通过！\n")
     return True
 
+
 def main():
-    root_dir = r"G:\监控视频"
-    output_dir = r"G:\拼接后视频"
+    # load configs
+    cfg = load_config('config.ini')
+    aggregator = cfg['aggregator']
+    root_dir = cfg['root_dir']
+    output_dir = cfg['output_dir']
+    cpu_cores = cfg['cpu_cores']
 
     # 收集所有日期的视频
     date_videos = defaultdict(list)
@@ -119,7 +127,7 @@ def main():
         current_dir = os.path.basename(subdir)
         if len(current_dir) < 8:
             continue
-        date = current_dir[:8]
+        date = get_date_from_dir(current_dir, aggregator)
         for file in files:
             if file.lower().endswith('.mp4'):
                 full_path = os.path.join(subdir, file)
@@ -129,7 +137,7 @@ def main():
         print("❌ 未找到 MP4 视频文件，无法验证！")
         return
 
-    max_workers = min(4, os.cpu_count() or 1)  # 限制最多 4 个进程，防止 CPU 过载
+    max_workers = min(cpu_cores, os.cpu_count() or 1)  # 限制最多 4 个进程，防止 CPU 过载
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = []
@@ -145,6 +153,7 @@ def main():
             future.result()
 
     print("🎉 所有视频验证完成！")
+
 
 if __name__ == "__main__":
     main()

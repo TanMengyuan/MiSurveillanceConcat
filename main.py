@@ -3,12 +3,10 @@ import subprocess
 import sys
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
+from commons import load_config, get_date_from_dir
 
-def get_date_from_dir(dir_name):
-    """从目录名中提取日期，格式 YYYYMMDD"""
-    return dir_name[:8]
 
-def collect_video_files(root_dir):
+def collect_video_files(root_dir, aggregator):
     """遍历根目录，按日期收集所有 mp4 文件路径"""
     date_videos = defaultdict(list)
 
@@ -16,17 +14,18 @@ def collect_video_files(root_dir):
         current_dir = os.path.basename(subdir)
         if len(current_dir) < 8:
             continue
-        date = get_date_from_dir(current_dir)
+        date = get_date_from_dir(current_dir, aggregator)
         for file in files:
             if file.lower().endswith('.mp4'):
                 full_path = os.path.join(subdir, file)
                 date_videos[date].append(full_path)
-    
+
     # 按文件名排序
     for date in date_videos:
         date_videos[date].sort()
-    
+
     return date_videos
+
 
 def create_concat_list(video_files, list_file_path):
     """为 FFmpeg 创建 concat_list.txt 文件"""
@@ -34,6 +33,7 @@ def create_concat_list(video_files, list_file_path):
         for video in video_files:
             video = video.replace('\\', '/')  # 兼容 Windows 和 Linux
             f.write(f"file '{video}'\n")
+
 
 def concatenate_videos(date, video_files, output_dir):
     """使用 FFmpeg 拼接视频，支持并行处理"""
@@ -66,9 +66,14 @@ def concatenate_videos(date, video_files, output_dir):
         if os.path.exists(list_file):
             os.remove(list_file)
 
+
 def main():
-    root_dir = r"G:\监控视频"
-    output_dir = r"G:\拼接后视频"
+    # load configs
+    cfg = load_config('config.ini')
+    root_dir = cfg['root_dir']
+    output_dir = cfg['output_dir']
+    aggregator = cfg['aggregator']
+    cpu_cores = cfg['cpu_cores']
 
     # 检查 FFmpeg 是否可用
     try:
@@ -81,14 +86,14 @@ def main():
         sys.exit(1)
 
     # 收集视频文件
-    date_videos = collect_video_files(root_dir)
+    date_videos = collect_video_files(root_dir, aggregator)
 
     if not date_videos:
         print("未找到 MP4 视频文件，请检查目录路径和文件格式。")
         sys.exit(1)
 
     # 计算最大 CPU 线程数
-    max_workers = min(4, os.cpu_count() or 1)  # 最多 4 个进程，避免过载
+    max_workers = min(cpu_cores, os.cpu_count() or 1)  # 最多 4 个进程，避免过载
 
     # 使用多进程并行处理多个日期
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -96,12 +101,13 @@ def main():
         for date, video_files in date_videos.items():
             if video_files:
                 futures.append(executor.submit(concatenate_videos, date, video_files, output_dir))
-        
+
         # 等待所有任务完成
         for future in futures:
             future.result()
 
     print("🎉 所有视频拼接完成！")
+
 
 if __name__ == "__main__":
     main()
